@@ -226,16 +226,16 @@ function resolveThullaRound(roomId, gameState, players, thullaPlayerId) {
   gameState.pile     = [];
   gameState.leadSuit = null;
 
-  // Thulla player leads next round
-  const thullaIdx = gameState.turnOrder.indexOf(thullaPlayerId);
-  if (thullaIdx !== -1) {
+  // The penalized player (the one who receives the cards) leads the next round
+  const startIdx = gameState.turnOrder.indexOf(penalizedPlayerId);
+  if (startIdx !== -1) {
     gameState.turnOrder = [
-      ...gameState.turnOrder.slice(thullaIdx),
-      ...gameState.turnOrder.slice(0, thullaIdx),
+      ...gameState.turnOrder.slice(startIdx),
+      ...gameState.turnOrder.slice(0, startIdx),
     ];
   }
   gameState.turnIndex   = 0;
-  gameState.currentTurn = thullaPlayerId;
+  gameState.currentTurn = penalizedPlayerId || thullaPlayerId; // Fallback to thulla player safely
 
   return {
     thullaPlayerId,

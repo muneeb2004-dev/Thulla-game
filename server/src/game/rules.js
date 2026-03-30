@@ -34,15 +34,18 @@ function validatePlay({ playerId, card, hand, currentTurn, leadSuit }) {
     return { valid: false, reason: "Card not in your hand" };
   }
 
-  // Rule: Must follow lead suit — but if player breaks it that IS a Thulla
-  // A Thulla is a LEGAL play (the round ends, not the card gets rejected).
-  // Flag it so gameState can resolve the round-end penalty.
+  // Rule: Must follow lead suit if possible.
+  // A Thulla happens when you DON'T have the lead suit and are forced to play off-suit.
   if (leadSuit && card.suit !== leadSuit) {
     const hasLeadSuit = hand.some((c) => c.suit === leadSuit);
+    
+    // If you have the lead suit, you CANNOT play off-suit. Invalid move.
     if (hasLeadSuit) {
-      return { valid: true, isThulla: true }; // accepted, but triggers round end
+      return { valid: false, reason: `You must follow suit (${leadSuit})` };
     }
-    // Player has no card of lead suit — genuine off-suit, not a Thulla
+    
+    // If you DON'T have the lead suit, you play any card and it triggers a THULLA!
+    return { valid: true, isThulla: true };
   }
 
   return { valid: true };
