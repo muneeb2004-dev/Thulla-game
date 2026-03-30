@@ -58,7 +58,7 @@ httpServer.listen(PORT, () => {
   console.log(`\n🃏 ─────────────────────────────────────────`);
   console.log(`   Card Blitz Server`);
   console.log(`   http://localhost:${PORT}`);
-  console.log(`   CORS origin: ${CLIENT_URL}`);
+  console.log(`   CORS origin: Any (*)`);
   console.log(`🃏 ─────────────────────────────────────────\n`);
 });
 
