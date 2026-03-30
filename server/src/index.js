@@ -7,15 +7,13 @@ import { getAllRooms } from "./game/roomManager.js";
 
 // ─── Configuration ───────────────────────────────────────────────
 const PORT = process.env.PORT || 5000;
-const CLIENT_URL = process.env.CLIENT_URL || "http://localhost:5173";
 
 // ─── Express App ─────────────────────────────────────────────────
 const app = express();
 
 app.use(cors({
-  origin: CLIENT_URL,
+  origin: "*",
   methods: ["GET", "POST"],
-  credentials: true,
 }));
 
 app.use(express.json());
@@ -26,9 +24,8 @@ const httpServer = createServer(app);
 // ─── Socket.io Server ────────────────────────────────────────────
 const io = new Server(httpServer, {
   cors: {
-    origin: CLIENT_URL,
+    origin: "*",
     methods: ["GET", "POST"],
-    credentials: true,
   },
 });
 
