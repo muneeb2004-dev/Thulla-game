@@ -1,0 +1,43 @@
+@import "tailwindcss";
+
+/* Google Font — loaded in index.html */
+body {
+  font-family: "Outfit", system-ui, sans-serif;
+}
+
+/* Smooth card hover lift — the only custom behaviour Tailwind can't express inline */
+.card-lift {
+  transition: transform 0.18s ease, box-shadow 0.18s ease;
+}
+.card-lift:hover:not(.card-disabled) {
+  transform: translateY(-14px);
+  box-shadow: 0 16px 32px rgba(0, 0, 0, 0.4);
+}
+.card-selected {
+  transform: translateY(-18px) !important;
+  outline: 2px solid #60a5fa;
+  outline-offset: 2px;
+}
+.card-disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+/* Stacked hand overlap */
+.hand-card + .hand-card {
+  margin-left: -14px;
+}
+
+/* Toast slide-in */
+@keyframes toast-in {
+  from { opacity: 0; transform: translateX(24px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+.toast-enter { animation: toast-in 0.25s ease; }
+
+/* Pulse ring for current turn */
+@keyframes ping-slow {
+  0%,100% { box-shadow: 0 0 0 0 rgba(96,165,250,0.5); }
+  50%      { box-shadow: 0 0 0 6px rgba(96,165,250,0); }
+}
+.turn-ring { animation: ping-slow 1.8s ease-in-out infinite; }

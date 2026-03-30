@@ -1,0 +1,15 @@
+{
+  "name": "card-blitz",
+  "version": "1.0.0",
+  "description": "Real-time multiplayer card game — React + Node.js + Socket.io",
+  "private": true,
+  "scripts": {
+    "dev":          "concurrently -n \"server,client\" -c \"cyan,magenta\" \"npm run dev:server\" \"npm run dev:client\"",
+    "dev:server":   "npm run dev --prefix server",
+    "dev:client":   "npm run dev --prefix client",
+    "install:all":  "npm install && npm install --prefix server && npm install --prefix client"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.2"
+  }
+}
