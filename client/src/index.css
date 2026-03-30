@@ -41,3 +41,22 @@ body {
   50%      { box-shadow: 0 0 0 6px rgba(96,165,250,0); }
 }
 .turn-ring { animation: ping-slow 1.8s ease-in-out infinite; }
+
+/* Horizontal scrolling for large hands */
+.cards-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: #3b82f6 transparent;
+}
+.cards-scroll::-webkit-scrollbar {
+  height: 8px;
+}
+.cards-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+.cards-scroll::-webkit-scrollbar-thumb {
+  background-color: #1e293b;
+  border-radius: 9999px;
+}
+.cards-scroll:hover::-webkit-scrollbar-thumb {
+  background-color: #3b82f6;
+}

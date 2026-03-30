@@ -7,7 +7,7 @@ export default function Card({ card, faceDown = false, selected = false, disable
 
   const red    = RED.has(card.suit);
   const symbol = SYMBOLS[card.suit] ?? "?";
-  const color  = red ? "text-rose-500" : "text-slate-100";
+  const color  = red ? "text-rose-500" : "text-slate-900";
 
   return (
     <div

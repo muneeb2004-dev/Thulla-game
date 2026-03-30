@@ -40,7 +40,7 @@ function ToastStack({ toasts }) {
 }
 
 /* ── Lobby screen ─────────────────────────────────────────────── */
-function Lobby({ roomId, players, isHost, onStart }) {
+function Lobby({ roomId, players, isHost, onStart, maxPlayers }) {
   const [copied, setCopied] = useState(false);
 
   function copy() {
@@ -73,7 +73,7 @@ function Lobby({ roomId, players, isHost, onStart }) {
         {/* Players */}
         <div className="flex flex-col gap-2 mb-5">
           <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
-            Players ({players.length}/4)
+            Players ({players.length}/{maxPlayers})
           </p>
           {players.map(p => (
             <div key={p.id}
@@ -83,7 +83,7 @@ function Lobby({ roomId, players, isHost, onStart }) {
               {p.isHost && <span className="text-xs text-amber-400">host</span>}
             </div>
           ))}
-          {Array.from({ length: 4 - players.length }).map((_, i) => (
+          {Array.from({ length: Math.max(0, maxPlayers - players.length) }).map((_, i) => (
             <div key={i}
                  className="flex items-center gap-2 px-3 py-2 rounded-lg border border-dashed border-white/8 text-sm text-slate-600">
               <span className="w-2 h-2 rounded-full bg-slate-700 flex-shrink-0" />
@@ -97,12 +97,12 @@ function Lobby({ roomId, players, isHost, onStart }) {
           <button
             id="btn-start-game"
             onClick={onStart}
-            disabled={players.length < 4}
+            disabled={players.length < maxPlayers}
             className="w-full py-2.5 rounded-lg bg-blue-600 hover:bg-blue-500 disabled:opacity-40
                        disabled:cursor-not-allowed text-white font-semibold text-sm transition"
           >
-            {players.length < 4
-              ? `Waiting for ${4 - players.length} more…`
+            {players.length < maxPlayers
+              ? `Waiting for ${maxPlayers - players.length} more player${maxPlayers - players.length > 1 ? "s" : ""}…`
               : "🚀 Start Game"}
           </button>
         ) : (
@@ -232,25 +232,24 @@ function Hand({ hand, isMyTurn, leadSuit, onPlay }) {
         )}
       </div>
 
-      {/* Cards row */}
-      <div className="flex items-end pb-2">
-        {hand.map((card, i) => {
-          const playable  = canPlay(card);
-          const isSelected = selected?.id === card.id;
-          return (
-            <Card
-              key={card.id}
-              card={card}
-              selected={isSelected}
-              disabled={!playable}
-              onClick={() => handleSelect(card)}
-              style={{
-                zIndex: isSelected ? 20 : i,
-                ...(i === 0 ? {} : { marginLeft: "-14px" }),
-              }}
-            />
-          );
-        })}
+      {/* Cards row slider */}
+      <div className="w-full max-w-[calc(100vw-240px)] overflow-x-auto cards-scroll pb-6 pt-4 px-2">
+        <div className="flex items-end gap-1.5 min-w-max mx-auto">
+          {hand.map((card, i) => {
+            const playable  = canPlay(card);
+            const isSelected = selected?.id === card.id;
+            return (
+              <Card
+                key={card.id}
+                card={card}
+                selected={isSelected}
+                disabled={!playable}
+                onClick={() => handleSelect(card)}
+                style={{ zIndex: isSelected ? 20 : i }}
+              />
+            );
+          })}
+        </div>
       </div>
 
       {/* Play button */}
@@ -336,6 +335,7 @@ export default function Game() {
   const [players,     setPlayers]     = useState(state?.players ?? []);
   const [isHost,      setIsHost]      = useState(state?.isHost ?? false);
   const [selfId,      setSelfId]      = useState(null);
+  const [maxPlayers,  setMaxPlayers]  = useState(state?.maxPlayers ?? 4);
 
   const [hand,        setHand]        = useState([]);
   const [currentTurn, setCurrentTurn] = useState(null);
@@ -366,8 +366,9 @@ export default function Game() {
   useEffect(() => {
     if (!socket) return;
 
-    socket.on("playerJoined", ({ players: ps }) => {
+    socket.on("playerJoined", ({ players: ps, maxPlayers: mp }) => {
       setPlayers(ps);
+      if (mp) setMaxPlayers(mp);
       add(`${ps.at(-1)?.name} joined`, "info");
     });
 
@@ -376,7 +377,10 @@ export default function Game() {
       add("A player left", "warning");
     });
 
-    socket.on("roomFull", () => add("Room full — game can start!", "success"));
+    socket.on("roomFull", ({ maxPlayers: mp }) => {
+      if (mp) setMaxPlayers(mp);
+      add("Room full — game can start!", "success");
+    });
 
     socket.on("gameStarted", (v) => {
       setPhase("playing");
@@ -442,7 +446,7 @@ export default function Game() {
   if (phase === "lobby") {
     return (
       <>
-        <Lobby roomId={roomId} players={players} isHost={isHost} onStart={handleStart} />
+        <Lobby roomId={roomId} players={players} isHost={isHost} onStart={handleStart} maxPlayers={maxPlayers} />
         <ToastStack toasts={toasts} />
       </>
     );

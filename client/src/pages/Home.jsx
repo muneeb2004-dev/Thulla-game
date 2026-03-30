@@ -6,23 +6,24 @@ export default function Home() {
   const { socket, connected } = useSocket();
   const navigate = useNavigate();
 
-  const [name,     setName]     = useState("");
-  const [roomCode, setRoomCode] = useState("");
-  const [tab,      setTab]      = useState("create"); // "create" | "join"
-  const [loading,  setLoading]  = useState(false);
-  const [error,    setError]    = useState("");
+  const [name,       setName]       = useState("");
+  const [roomCode,   setRoomCode]   = useState("");
+  const [tab,        setTab]        = useState("create"); // "create" | "join"
+  const [loading,    setLoading]    = useState(false);
+  const [error,      setError]      = useState("");
+  const [maxPlayers, setMaxPlayers] = useState(4); // Default to 4
 
   useEffect(() => {
     if (!socket) return;
 
-    socket.on("roomCreated", ({ roomId, players }) => {
+    socket.on("roomCreated", ({ roomId, players, maxPlayers }) => {
       setLoading(false);
-      navigate(`/game/${roomId}`, { state: { playerName: name, players, isHost: true } });
+      navigate(`/game/${roomId}`, { state: { playerName: name, players, isHost: true, maxPlayers } });
     });
 
-    socket.on("playerJoined", ({ roomId, players }) => {
+    socket.on("playerJoined", ({ roomId, players, maxPlayers }) => {
       setLoading(false);
-      navigate(`/game/${roomId}`, { state: { playerName: name, players, isHost: false } });
+      navigate(`/game/${roomId}`, { state: { playerName: name, players, isHost: false, maxPlayers } });
     });
 
     socket.on("error", ({ message }) => {
@@ -48,7 +49,7 @@ export default function Home() {
   function handleCreate() {
     if (!validate()) return;
     setLoading(true);
-    socket.emit("createRoom", { playerName: name.trim() });
+    socket.emit("createRoom", { playerName: name.trim(), maxPlayers });
   }
 
   function handleJoin() {
@@ -118,15 +119,32 @@ export default function Home() {
 
           {/* Tab body */}
           {tab === "create" ? (
-            <button
-              id="btn-create-room"
-              onClick={handleCreate}
-              disabled={loading || !connected}
-              className="w-full py-2.5 rounded-lg bg-blue-600 hover:bg-blue-500 disabled:opacity-40
-                         disabled:cursor-not-allowed text-white font-semibold text-sm transition"
-            >
-              {loading ? "Creating…" : "✨ Create Game"}
-            </button>
+            <div className="flex flex-col gap-3">
+              <div>
+                <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1.5">
+                  Room Size
+                </label>
+                <select
+                  className={`${input} appearance-none cursor-pointer border-r-8 border-transparent`}
+                  value={maxPlayers}
+                  onChange={e => setMaxPlayers(Number(e.target.value))}
+                >
+                  <option value={4} className="text-slate-900">4 Players</option>
+                  <option value={3} className="text-slate-900">3 Players</option>
+                  <option value={2} className="text-slate-900">2 Players</option>
+                </select>
+              </div>
+              
+              <button
+                id="btn-create-room"
+                onClick={handleCreate}
+                disabled={loading || !connected}
+                className="w-full py-2.5 rounded-lg bg-blue-600 hover:bg-blue-500 disabled:opacity-40
+                           disabled:cursor-not-allowed text-white font-semibold text-sm transition"
+              >
+                {loading ? "Creating…" : "✨ Create Game"}
+              </button>
+            </div>
           ) : (
             <div className="flex flex-col gap-3">
               <input

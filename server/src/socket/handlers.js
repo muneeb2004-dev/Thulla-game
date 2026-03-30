@@ -8,7 +8,6 @@ import {
   removePlayer,
   isRoomFull,
   getRoom,
-  MAX_PLAYERS,
 } from "../game/roomManager.js";
 import { initGame, getPlayerView, removeGame, playCard } from "../game/gameState.js";
 import { formatCard } from "../game/deck.js";
@@ -19,24 +18,28 @@ import { formatCard } from "../game/deck.js";
  * @param {import("socket.io").Socket} socket — the individual connection
  */
 export function registerHandlers(io, socket) {
-  // ── Create Room ──────────────────────────────────────────────
-  socket.on("createRoom", ({ playerName } = {}) => {
+  // ── Create Room ────────────────────────────────────────────────
+  socket.on("createRoom", ({ playerName, maxPlayers = 4 } = {}) => {
     if (!playerName?.trim()) {
       return socket.emit("error", { message: "Player name is required" });
     }
 
-    const { room } = createRoom(socket.id, playerName.trim());
+    // Must be between 2 and 4
+    const validMax = Math.max(2, Math.min(4, Number(maxPlayers) || 4));
+
+    const { room } = createRoom(socket.id, playerName.trim(), validMax);
 
     // Join the Socket.io channel so broadcasts work
     socket.join(room.roomId);
 
     console.log(
-      `🏠 Room ${room.roomId} created by ${playerName} (${socket.id})`
+      `🏠 Room created: ${room.roomId} by ${playerName} (max: ${room.maxPlayers})`
     );
 
     socket.emit("roomCreated", {
       roomId: room.roomId,
       players: room.players,
+      maxPlayers: room.maxPlayers,
     });
   });
 
@@ -64,6 +67,7 @@ export function registerHandlers(io, socket) {
     io.to(id).emit("playerJoined", {
       roomId: id,
       players: room.players,
+      maxPlayers: room.maxPlayers,
       newPlayer: playerName.trim(),
     });
 
@@ -73,6 +77,7 @@ export function registerHandlers(io, socket) {
       io.to(id).emit("roomFull", {
         roomId: id,
         players: room.players,
+        maxPlayers: room.maxPlayers,
       });
     }
   });
@@ -96,10 +101,10 @@ export function registerHandlers(io, socket) {
       return socket.emit("error", { message: "Only the host can start the game" });
     }
 
-    // Need exactly MAX_PLAYERS to start
-    if (room.players.length < MAX_PLAYERS) {
-      return socket.emit("error", {
-        message: `Need ${MAX_PLAYERS} players to start (currently ${room.players.length})`,
+    // Start game requires room.maxPlayers
+    if (room.players.length < room.maxPlayers) {
+      return socket.emit("error", { 
+        message: `Need exactly ${room.maxPlayers} players to start the game` 
       });
     }
 

@@ -22,9 +22,10 @@ function generateRoomId() {
  * Create a new room and add the creator as the first player.
  * @param {string} socketId
  * @param {string} playerName
+ * @param {number} maxPlayers
  * @returns {{ room: object }}
  */
-function createRoom(socketId, playerName) {
+function createRoom(socketId, playerName, maxPlayers = 4) {
   const roomId = generateRoomId();
 
   const player = {
@@ -36,6 +37,7 @@ function createRoom(socketId, playerName) {
   const room = {
     roomId,
     players: [player],
+    maxPlayers,
     gameStatus: "waiting", // "waiting" | "playing" | "finished"
     createdAt: Date.now(),
   };
@@ -58,7 +60,7 @@ function joinRoom(roomId, socketId, playerName) {
     return { error: "Room not found" };
   }
 
-  if (room.players.length >= MAX_PLAYERS) {
+  if (room.players.length >= room.maxPlayers) {
     return { error: "Room is full" };
   }
 
@@ -124,7 +126,7 @@ function getRoom(roomId) {
  */
 function isRoomFull(roomId) {
   const room = rooms.get(roomId);
-  return room ? room.players.length >= MAX_PLAYERS : false;
+  return room ? room.players.length >= room.maxPlayers : false;
 }
 
 /**
@@ -136,7 +138,6 @@ function getAllRooms() {
 }
 
 export {
-  MAX_PLAYERS,
   createRoom,
   joinRoom,
   removePlayer,
