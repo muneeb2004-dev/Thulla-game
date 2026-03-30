@@ -53,6 +53,18 @@ body {
 .cards-scroll::-webkit-scrollbar-track {
   background: transparent;
 }
+
+.cards-scroll::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.4);
+}
+
+.hidden-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.hidden-scrollbar {
+  -ms-overflow-style: none;  /* IE and Edge */
+  scrollbar-width: none;  /* Firefox */
+}
 .cards-scroll::-webkit-scrollbar-thumb {
   background-color: #1e293b;
   border-radius: 9999px;

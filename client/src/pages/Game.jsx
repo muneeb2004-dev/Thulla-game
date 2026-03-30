@@ -233,7 +233,7 @@ function Hand({ hand, isMyTurn, leadSuit, onPlay }) {
       </div>
 
       {/* Cards row slider */}
-      <div className="w-full max-w-[calc(100vw-240px)] overflow-x-auto cards-scroll pb-6 pt-4 px-2">
+      <div className="w-full max-w-[calc(100vw-16px)] md:max-w-[calc(100vw-240px)] overflow-x-auto cards-scroll pb-6 pt-4 px-2">
         <div className="flex items-end gap-1.5 min-w-max mx-auto">
           {hand.map((card, i) => {
             const playable  = canPlay(card);
@@ -457,18 +457,18 @@ export default function Game() {
     <div className="min-h-screen bg-slate-950 text-white flex flex-col">
 
       {/* ── Top bar ──────────────────────────────────────────── */}
-      <header className="flex items-center justify-between px-4 py-3
+      <header className="flex flex-wrap items-center justify-between gap-2 px-3 sm:px-4 py-3
                          bg-slate-900 border-b border-white/8 flex-shrink-0">
-        <div className="flex items-center gap-3">
-          <span className="text-xl">🃏</span>
-          <div>
+        <div className="flex items-center gap-2 sm:gap-3">
+          <span className="text-lg sm:text-xl">🃏</span>
+          <div className="hidden sm:block">
             <h1 className="text-base font-bold leading-none">Card Blitz</h1>
             <p className="text-[11px] text-slate-500 font-mono mt-0.5">{roomId}</p>
           </div>
         </div>
 
         {/* Current turn banner */}
-        <div className={`text-sm px-3 py-1 rounded-full border transition
+        <div className={`text-xs sm:text-sm px-3 py-1 rounded-full border transition max-w-[150px] sm:max-w-none truncate text-center
           ${isMyTurn
             ? "bg-blue-900/50 border-blue-700 text-blue-300"
             : "bg-slate-800 border-slate-700 text-slate-400"}`}
@@ -482,22 +482,22 @@ export default function Game() {
           id="btn-leave"
           onClick={() => navigate("/")}
           className="text-xs px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700
-                     text-slate-400 hover:text-slate-200 transition"
+                     text-slate-400 hover:text-slate-200 transition whitespace-nowrap"
         >
           Leave
         </button>
       </header>
 
       {/* ── Main layout ──────────────────────────────────────── */}
-      <div className="flex flex-1 overflow-hidden">
+      <div className="flex flex-col md:flex-row flex-1 overflow-hidden">
 
         {/* Sidebar — players */}
-        <aside className="w-48 flex-shrink-0 border-r border-white/8 bg-slate-900/50 p-3 flex flex-col gap-4">
-          <div>
-            <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-2">
+        <aside className="w-full md:w-48 flex-shrink-0 border-b md:border-b-0 md:border-r border-white/8 bg-slate-900/50 p-3 flex flex-row md:flex-col gap-4 overflow-x-auto md:overflow-y-auto hidden-scrollbar">
+          <div className="flex-1 min-w-max">
+            <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-2 hidden md:block">
               Players
             </p>
-            <div className="flex flex-col gap-1.5">
+            <div className="flex flex-row md:flex-col gap-1.5 pb-1 md:pb-0">
               {players.map(p => (
                 <PlayerRow
                   key={p.id}
@@ -512,7 +512,7 @@ export default function Game() {
           </div>
 
           {/* Scores */}
-          <div>
+          <div className="hidden md:block">
             <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-2">
               Tricks Won
             </p>
@@ -527,7 +527,7 @@ export default function Game() {
         </aside>
 
         {/* Center — pile + your hand */}
-        <main className="flex-1 flex flex-col items-center justify-between p-6 overflow-auto">
+        <main className="flex-1 flex flex-col items-center justify-between p-2 pt-4 md:p-6 overflow-hidden md:overflow-auto">
 
           {/* ── Pile (center) ───────────────────────────────── */}
           <div className="flex-1 flex items-center justify-center">
