@@ -6,12 +6,12 @@ import Card from "../components/Card.jsx";
 /* ── Suit helpers ─────────────────────────────────────────────── */
 const SYM  = { hearts:"♥", diamonds:"♦", clubs:"♣", spades:"♠" };
 const RED  = new Set(["hearts","diamonds"]);
-const suitColor = (s) => RED.has(s) ? "text-rose-500" : "text-slate-700";
+const suitColor = s => RED.has(s) ? "text-red-400" : "text-gray-300";
 
-/* ── Toast (lightweight, inline) ──────────────────────────────── */
+/* ── Toasts ───────────────────────────────────────────────────── */
 function useToasts() {
   const [toasts, setToasts] = useState([]);
-  const add    = useCallback((msg, type = "info", ms = 4000) => {
+  const add = useCallback((msg, type = "info", ms = 4000) => {
     const id = Date.now() + Math.random();
     setToasts(t => [...t, { id, msg, type }]);
     setTimeout(() => setToasts(t => t.filter(x => x.id !== id)), ms);
@@ -20,10 +20,10 @@ function useToasts() {
 }
 
 const TOAST_CLS = {
-  info:    "bg-slate-800 border-slate-600 text-slate-200",
-  success: "bg-emerald-900 border-emerald-700 text-emerald-200",
-  warning: "bg-amber-900   border-amber-700   text-amber-200",
-  error:   "bg-rose-900    border-rose-700    text-rose-200",
+  info:    "bg-[#1a1a1a] border-white/15 text-gray-200",
+  success: "bg-emerald-950/90 border-emerald-800/60 text-emerald-200",
+  warning: "bg-[#2a1500]/90 border-amber-800/60 text-amber-200",
+  error:   "bg-red-950/90 border-red-800/60 text-red-200",
 };
 
 function ToastStack({ toasts }) {
@@ -31,7 +31,8 @@ function ToastStack({ toasts }) {
     <div className="fixed top-4 right-4 z-50 flex flex-col gap-2 pointer-events-none">
       {toasts.map(t => (
         <div key={t.id}
-             className={`toast-enter px-4 py-2.5 rounded-lg border text-sm max-w-xs ${TOAST_CLS[t.type]}`}>
+             className={`toast-enter px-4 py-2.5 rounded-xl border backdrop-blur-sm
+                         text-sm max-w-xs shadow-lg ${TOAST_CLS[t.type]}`}>
           {t.msg}
         </div>
       ))}
@@ -39,7 +40,7 @@ function ToastStack({ toasts }) {
   );
 }
 
-/* ── Lobby screen ─────────────────────────────────────────────── */
+/* ── Lobby ────────────────────────────────────────────────────── */
 function Lobby({ roomId, players, isHost, onStart, maxPlayers }) {
   const [copied, setCopied] = useState(false);
 
@@ -51,129 +52,142 @@ function Lobby({ roomId, players, isHost, onStart, maxPlayers }) {
   }
 
   return (
-    <div className="min-h-screen bg-slate-950 text-white flex items-center justify-center p-4">
-      <div className="w-full max-w-sm bg-slate-900 border border-white/8 rounded-2xl p-6 shadow-xl">
+    <div className="min-h-screen bg-black text-white flex items-center justify-center p-4">
+      <div className="w-full max-w-sm">
+        <div className="bg-[#0f0f0f] border border-white/10 rounded-2xl p-6
+                        shadow-2xl shadow-black">
 
-        <h2 className="text-xl font-bold text-center mb-1">Waiting for players</h2>
-        <p className="text-slate-400 text-sm text-center mb-5">Share the room code with friends</p>
-
-        {/* Room code */}
-        <div className="bg-slate-800 rounded-xl p-4 mb-5 text-center">
-          <p className="text-xs text-slate-500 uppercase tracking-widest mb-1">Room Code</p>
-          <p className="text-3xl font-black font-mono tracking-[.2em] text-blue-400">{roomId}</p>
-          <button
-            id="btn-copy-code"
-            onClick={copy}
-            className="mt-2 text-xs px-3 py-1 rounded-md bg-white/5 hover:bg-white/10 text-slate-300 transition"
-          >
-            {copied ? "✅ Copied!" : "📋 Copy"}
-          </button>
-        </div>
-
-        {/* Players */}
-        <div className="flex flex-col gap-2 mb-5">
-          <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
-            Players ({players.length}/{maxPlayers})
+          <h2 className="text-xl font-bold text-center mb-0.5">Waiting for players</h2>
+          <p className="text-gray-600 text-xs text-center mb-5">
+            Share the room code with your friends
           </p>
-          {players.map(p => (
-            <div key={p.id}
-                 className="flex items-center gap-2 px-3 py-2 rounded-lg bg-slate-800 text-sm">
-              <span className="w-2 h-2 rounded-full bg-emerald-400 flex-shrink-0" />
-              <span className="flex-1 font-medium">{p.name}</span>
-              {p.isHost && <span className="text-xs text-amber-400">host</span>}
-            </div>
-          ))}
-          {Array.from({ length: Math.max(0, maxPlayers - players.length) }).map((_, i) => (
-            <div key={i}
-                 className="flex items-center gap-2 px-3 py-2 rounded-lg border border-dashed border-white/8 text-sm text-slate-600">
-              <span className="w-2 h-2 rounded-full bg-slate-700 flex-shrink-0" />
-              Waiting…
-            </div>
-          ))}
-        </div>
 
-        {/* Start / waiting */}
-        {isHost ? (
-          <button
-            id="btn-start-game"
-            onClick={onStart}
-            disabled={players.length < maxPlayers}
-            className="w-full py-2.5 rounded-lg bg-blue-600 hover:bg-blue-500 disabled:opacity-40
-                       disabled:cursor-not-allowed text-white font-semibold text-sm transition"
-          >
-            {players.length < maxPlayers
-              ? `Waiting for ${maxPlayers - players.length} more player${maxPlayers - players.length > 1 ? "s" : ""}…`
-              : "🚀 Start Game"}
-          </button>
-        ) : (
-          <p className="text-center text-slate-500 text-sm">Waiting for host to start…</p>
-        )}
+          {/* Room code */}
+          <div className="bg-white/4 border border-white/8 rounded-xl p-4 mb-5 text-center">
+            <p className="text-[10px] text-gray-600 uppercase tracking-widest mb-1">Room Code</p>
+            <p className="text-3xl font-black font-mono tracking-[.2em] text-white">
+              {roomId}
+            </p>
+            <button
+              id="btn-copy-code"
+              onClick={copy}
+              className="mt-2.5 text-xs px-3 py-1 rounded-lg bg-white/5 hover:bg-white/10
+                         text-gray-500 hover:text-gray-200 border border-white/8 transition"
+            >
+              {copied ? "✅ Copied!" : "📋 Copy"}
+            </button>
+          </div>
+
+          {/* Players */}
+          <div className="flex flex-col gap-1.5 mb-5">
+            <p className="text-[10px] font-semibold text-gray-600 uppercase tracking-wider">
+              Players ({players.length}/{maxPlayers})
+            </p>
+            {players.map(p => (
+              <div key={p.id}
+                   className="flex items-center gap-2 px-3 py-2 rounded-lg
+                              bg-white/4 border border-white/5 text-sm">
+                <span className="w-2 h-2 rounded-full bg-emerald-400 flex-shrink-0" />
+                <span className="flex-1 font-medium">{p.name}</span>
+                {p.isHost && (
+                  <span className="text-[10px] px-1.5 py-0.5 rounded-md
+                                   bg-yellow-950/50 text-yellow-500 border border-yellow-900/40">
+                    host
+                  </span>
+                )}
+              </div>
+            ))}
+            {Array.from({ length: Math.max(0, maxPlayers - players.length) }).map((_, i) => (
+              <div key={i}
+                   className="flex items-center gap-2 px-3 py-2 rounded-lg
+                              border border-dashed border-white/6 text-sm text-gray-700">
+                <span className="w-2 h-2 rounded-full bg-gray-800 flex-shrink-0" />
+                Waiting…
+              </div>
+            ))}
+          </div>
+
+          {isHost ? (
+            <button
+              id="btn-start-game"
+              onClick={onStart}
+              disabled={players.length < maxPlayers}
+              className="w-full py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500
+                         disabled:opacity-40 disabled:cursor-not-allowed
+                         text-white font-bold text-sm transition-all hover:-translate-y-px
+                         shadow-md shadow-blue-950/60"
+            >
+              {players.length < maxPlayers
+                ? `Waiting for ${maxPlayers - players.length} more player${maxPlayers - players.length > 1 ? "s" : ""}…`
+                : "🚀 Start Game"}
+            </button>
+          ) : (
+            <p className="text-center text-gray-700 text-sm py-1">
+              Waiting for the host to start…
+            </p>
+          )}
+        </div>
       </div>
     </div>
   );
 }
 
-/* ── Player row (sidebar) ────────────────────────────────────── */
+/* ── Player row ───────────────────────────────────────────────── */
 function PlayerRow({ player, isCurrentTurn, isSelf, score, isSafe }) {
   return (
     <div className={[
-      "flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition",
+      "flex items-center gap-2 px-3 py-2 rounded-xl text-sm transition-all",
       isCurrentTurn
-        ? "turn-ring bg-blue-900/40 border border-blue-700 text-white"
+        ? "turn-ring bg-blue-950/50 border border-blue-700/60 text-white"
         : isSafe
-        ? "bg-emerald-900/20 border border-emerald-800/40 text-emerald-400"
-        : "bg-slate-800/60 border border-transparent text-slate-300",
+        ? "bg-emerald-950/30 border border-emerald-900/40 text-emerald-400"
+        : "bg-white/3 border border-white/5 text-gray-500",
     ].join(" ")}>
-      {/* Status dot */}
       <span className={`w-2 h-2 rounded-full flex-shrink-0 ${
-        isSafe ? "bg-emerald-400" : isCurrentTurn ? "bg-blue-400 animate-pulse" : "bg-slate-500"
+        isSafe ? "bg-emerald-400" : isCurrentTurn ? "bg-blue-400 animate-pulse" : "bg-gray-700"
       }`} />
-
-      {/* Name */}
       <span className="flex-1 font-medium truncate min-w-0">
         {player.name}
-        {isSelf && <span className="ml-1 text-[10px] text-slate-500">(you)</span>}
+        {isSelf && <span className="ml-1 text-[10px] text-gray-700">(you)</span>}
       </span>
-
-      {/* Cards / safe badge */}
       {isSafe
-        ? <span className="text-xs text-emerald-400 font-semibold">SAFE</span>
-        : <span className="text-xs text-slate-500 tabular-nums">
+        ? <span className="text-[10px] font-bold text-emerald-400 tracking-wide">SAFE</span>
+        : <span className="text-[11px] text-gray-700 tabular-nums">
             {player.cardCount ?? player.hand?.length ?? 0}
-            <span className="ml-0.5 text-slate-600">🃏</span>
+            <span className="ml-0.5">🃏</span>
           </span>
       }
     </div>
   );
 }
 
-/* ── Central pile ─────────────────────────────────────────────── */
+/* ── Pile ─────────────────────────────────────────────────────── */
 function Pile({ pile, leadSuit, players }) {
   return (
     <div className="flex flex-col items-center gap-3">
-      {/* Lead suit label */}
       {leadSuit && (
         <div className="flex items-center gap-1.5 text-sm">
-          <span className="text-slate-400">Lead suit:</span>
-          <span className={`text-lg font-bold ${suitColor(leadSuit)}`}>{SYM[leadSuit]}</span>
-          <span className="text-slate-400 capitalize">{leadSuit}</span>
+          <span className="text-gray-600">Lead suit:</span>
+          <span className={`text-xl font-bold ${suitColor(leadSuit)}`}>{SYM[leadSuit]}</span>
+          <span className="text-gray-600 capitalize">{leadSuit}</span>
         </div>
       )}
-
-      {/* Pile area */}
       <div
-        className="flex items-center justify-center gap-3 rounded-2xl border border-white/8
-                   bg-slate-800/50 min-h-[128px] px-6"
+        className={`flex items-center justify-center gap-3 rounded-2xl px-6
+                    min-h-[128px] border transition-all duration-300
+                    ${pile.length > 0
+                      ? "border-white/10 bg-white/4"
+                      : "border-dashed border-white/6 bg-white/2"}`}
         style={{ minWidth: "280px" }}
       >
         {pile.length === 0
-          ? <span className="text-slate-600 text-sm">No cards played yet</span>
+          ? <span className="text-gray-700 text-sm">No cards played yet</span>
           : pile.map(({ playerId, card }, i) => {
               const p = players.find(x => (x.id ?? x) === playerId);
               return (
                 <div key={i} className="flex flex-col items-center gap-1">
                   <Card card={card} disabled />
-                  <span className="text-[11px] text-slate-500 max-w-[66px] text-center truncate">
+                  <span className="text-[11px] text-gray-600 max-w-[66px] text-center truncate">
                     {p?.name ?? "?"}
                   </span>
                 </div>
@@ -181,23 +195,24 @@ function Pile({ pile, leadSuit, players }) {
             })
         }
       </div>
-
       {pile.length > 0 && (
-        <span className="text-xs text-slate-600">{pile.length} card{pile.length !== 1 ? "s" : ""} in play</span>
+        <span className="text-xs text-gray-700">
+          {pile.length} card{pile.length !== 1 ? "s" : ""} in play
+        </span>
       )}
     </div>
   );
 }
 
-/* ── Your hand ───────────────────────────────────────────────── */
+/* ── Hand ─────────────────────────────────────────────────────── */
 function Hand({ hand, isMyTurn, leadSuit, onPlay }) {
   const [selected, setSelected] = useState(null);
 
   function canPlay(card) {
     if (!isMyTurn) return false;
-    if (!leadSuit)  return true;
+    if (!leadSuit) return true;
     if (card.suit === leadSuit) return true;
-    return !hand.some(c => c.suit === leadSuit); // off-suit ok if no lead suit
+    return !hand.some(c => c.suit === leadSuit);
   }
 
   function handleSelect(card) {
@@ -213,30 +228,28 @@ function Hand({ hand, isMyTurn, leadSuit, onPlay }) {
 
   return (
     <div className="flex flex-col items-center gap-3">
-      {/* Status row */}
       <div className="flex items-center gap-2 text-sm">
-        <span className="text-slate-400">{hand.length} cards</span>
+        <span className="text-gray-600">{hand.length} cards</span>
         {isMyTurn && (
-          <span className="px-2 py-0.5 rounded-full text-xs font-semibold
-                           bg-blue-900/60 border border-blue-700 text-blue-300">
-            Your turn
+          <span className="px-2.5 py-0.5 rounded-full text-xs font-bold
+                           bg-blue-950/60 border border-blue-800/60 text-blue-300">
+            ⚡ Your turn
           </span>
         )}
         {selected && isMyTurn && (
-          <span className="text-slate-400">
-            — playing{" "}
-            <span className={`font-bold ${suitColor(selected.suit)}`}>
+          <span className="text-gray-600">
+            — <span className={`font-bold ${suitColor(selected.suit)}`}>
               {selected.value} {SYM[selected.suit]}
             </span>
           </span>
         )}
       </div>
 
-      {/* Cards row slider */}
-      <div className="w-full max-w-[calc(100vw-16px)] md:max-w-[calc(100vw-240px)] overflow-x-auto cards-scroll pb-6 pt-4 px-2">
+      <div className="w-full max-w-[calc(100vw-16px)] md:max-w-[calc(100vw-240px)]
+                      overflow-x-auto cards-scroll pb-6 pt-4 px-2">
         <div className="flex items-end gap-1.5 min-w-max mx-auto">
           {hand.map((card, i) => {
-            const playable  = canPlay(card);
+            const playable   = canPlay(card);
             const isSelected = selected?.id === card.id;
             return (
               <Card
@@ -252,58 +265,65 @@ function Hand({ hand, isMyTurn, leadSuit, onPlay }) {
         </div>
       </div>
 
-      {/* Play button */}
       {selected && isMyTurn && (
         <button
           id="btn-play-card"
           onClick={handlePlay}
-          className="px-6 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 text-white
-                     font-semibold text-sm transition shadow-lg"
+          className="px-6 py-2 rounded-xl bg-blue-600 hover:bg-blue-500
+                     text-white font-bold text-sm transition-all
+                     shadow-lg shadow-blue-950/60 hover:-translate-y-px"
         >
           Play {selected.value} of {selected.suit}
         </button>
       )}
 
       {!isMyTurn && (
-        <p className="text-slate-600 text-sm">Waiting for other players…</p>
+        <p className="text-gray-700 text-sm">Waiting for other players…</p>
       )}
     </div>
   );
 }
 
-/* ── Game over overlay ───────────────────────────────────────── */
+/* ── Game over overlay ────────────────────────────────────────── */
 function GameOverOverlay({ result, onLeave }) {
   if (!result) return null;
   const { loser, safePlayers = [] } = result;
 
   return (
-    <div className="fixed inset-0 z-50 bg-slate-950/90 flex items-center justify-center p-4">
-      <div className="w-full max-w-sm bg-slate-900 border border-white/10 rounded-2xl p-6 shadow-2xl text-center">
+    <div className="fixed inset-0 z-50 bg-black/90 backdrop-blur-sm
+                    flex items-center justify-center p-4">
+      <div className="w-full max-w-sm bg-[#0f0f0f] border border-white/10
+                      rounded-2xl p-6 shadow-2xl text-center">
         <div className="text-5xl mb-3">{loser ? "💀" : "🎉"}</div>
-        <h2 className="text-2xl font-bold mb-1">
+        <h2 className="text-2xl font-black mb-1 text-white">
           {loser ? `${loser.name} gets Thulla!` : "Game Over"}
         </h2>
         {loser && (
-          <p className="text-slate-400 text-sm mb-4">
+          <p className="text-gray-600 text-sm mb-4">
             Stuck with {loser.handCount} card{loser.handCount !== 1 ? "s" : ""}
           </p>
         )}
 
         {safePlayers.length > 0 && (
           <div className="flex flex-col gap-1.5 mb-5 text-left">
-            <p className="text-xs text-slate-500 uppercase tracking-wider mb-1">Safe players 🛡️</p>
+            <p className="text-[10px] text-gray-600 uppercase tracking-wider mb-1">
+              Safe players 🛡️
+            </p>
             {safePlayers.map((p, i) => (
               <div key={p.id}
-                   className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-emerald-900/30 text-emerald-300 text-sm">
+                   className="flex items-center gap-2 px-3 py-1.5 rounded-xl
+                              bg-emerald-950/40 text-emerald-300 text-sm
+                              border border-emerald-900/30">
                 <span>{i === 0 ? "🥇" : i === 1 ? "🥈" : i === 2 ? "🥉" : "✓"}</span>
                 <span>{p.name}</span>
               </div>
             ))}
             {loser && (
-              <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-rose-900/30 text-rose-300 text-sm">
+              <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl
+                              bg-red-950/40 text-red-300 text-sm border border-red-900/30">
                 <span>💀</span>
                 <span>{loser.name}</span>
-                <span className="ml-auto text-xs text-rose-500">LOSER</span>
+                <span className="ml-auto text-[10px] text-red-500 font-bold">THULLA</span>
               </div>
             )}
           </div>
@@ -312,7 +332,9 @@ function GameOverOverlay({ result, onLeave }) {
         <button
           id="btn-leave-game"
           onClick={onLeave}
-          className="w-full py-2.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-semibold text-sm transition"
+          className="w-full py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500
+                     text-white font-bold text-sm transition-all hover:-translate-y-px
+                     shadow-md shadow-blue-950/60"
         >
           Back to Home
         </button>
@@ -325,10 +347,10 @@ function GameOverOverlay({ result, onLeave }) {
    Main Game page
 ══════════════════════════════════════════════════════════════ */
 export default function Game() {
-  const { roomId }    = useParams();
-  const { state }     = useLocation();
-  const navigate      = useNavigate();
-  const { socket }    = useSocket();
+  const { roomId }      = useParams();
+  const { state }       = useLocation();
+  const navigate        = useNavigate();
+  const { socket }      = useSocket();
   const { toasts, add } = useToasts();
 
   const [phase,       setPhase]       = useState("lobby");
@@ -345,7 +367,6 @@ export default function Game() {
   const [safePlayers, setSafePlayers] = useState(new Set());
   const [gameResult,  setGameResult]  = useState(null);
 
-  /* Apply personalized server view */
   function applyView(v) {
     if (v.currentTurn !== undefined) setCurrentTurn(v.currentTurn);
     if (v.leadSuit    !== undefined) setLeadSuit(v.leadSuit);
@@ -371,32 +392,18 @@ export default function Game() {
       if (mp) setMaxPlayers(mp);
       add(`${ps.at(-1)?.name} joined`, "info");
     });
+    socket.on("playerLeft",  ({ players: ps }) => { setPlayers(ps); add("A player left", "warning"); });
+    socket.on("roomFull",    ({ maxPlayers: mp }) => { if (mp) setMaxPlayers(mp); add("Room full — game can start!", "success"); });
+    socket.on("gameStarted", v => { setPhase("playing"); applyView(v); add("🎮 Game started! Ace of Spades goes first.", "success"); });
+    socket.on("cardPlayed",  v => applyView(v));
 
-    socket.on("playerLeft", ({ players: ps }) => {
-      setPlayers(ps);
-      add("A player left", "warning");
-    });
-
-    socket.on("roomFull", ({ maxPlayers: mp }) => {
-      if (mp) setMaxPlayers(mp);
-      add("Room full — game can start!", "success");
-    });
-
-    socket.on("gameStarted", (v) => {
-      setPhase("playing");
-      applyView(v);
-      add("🎮 Game started! Ace of Spades goes first.", "success");
-    });
-
-    socket.on("cardPlayed", (v) => applyView(v));
-
-    socket.on("roundEnded", (data) => {
+    socket.on("roundEnded", data => {
       applyView(data);
       const h = data.highestCard;
       add(
         `🚨 THULLA by ${data.thullaPlayerName}! ${data.penalizedPlayerName} picks up ` +
         `${data.cardsPickedUp} cards${h ? ` (highest: ${h.value}${SYM[h.suit]})` : ""}`,
-        "warning", 6000
+        "warning", 6000,
       );
     });
 
@@ -410,19 +417,17 @@ export default function Game() {
       add(pid === socket.id ? "🛡️ You're SAFE!" : `🛡️ ${playerName} is safe!`, "success", 5000);
     });
 
-    socket.on("gameEnded", (result) => {
+    socket.on("gameEnded", result => {
       setPhase("finished");
       setGameResult(result);
       add(
-        result.loser?.id === socket.id
-          ? "💀 You got Thulla!"
-          : `💀 ${result.loser?.name} is the Thulla loser!`,
-        result.loser?.id === socket.id ? "error" : "info", 6000
+        result.loser?.id === socket.id ? "💀 You got Thulla!" : `💀 ${result.loser?.name} is the Thulla loser!`,
+        result.loser?.id === socket.id ? "error" : "info", 6000,
       );
     });
 
     socket.on("invalidMove", ({ message }) => add(message, "error"));
-    socket.on("error", ({ message }) => add(message, "error"));
+    socket.on("error",       ({ message }) => add(message, "error"));
 
     return () => {
       ["playerJoined","playerLeft","roomFull","gameStarted","cardPlayed",
@@ -431,18 +436,15 @@ export default function Game() {
     };
   }, [socket]);
 
-  const handlePlayCard = useCallback((card) => {
+  const handlePlayCard = useCallback(card => {
     socket.emit("playCard", { roomId, card });
   }, [socket, roomId]);
 
   function handleStart() { socket.emit("startGame", { roomId }); }
 
-  /* Derived */
-  const self      = players.find(p => p.id === selfId);
-  const opponents = players.filter(p => p.id !== selfId);
-  const isMyTurn  = currentTurn === selfId && !safePlayers.has(selfId);
+  const self     = players.find(p => p.id === selfId);
+  const isMyTurn = currentTurn === selfId && !safePlayers.has(selfId);
 
-  /* ── Lobby phase ───────────────────────────────────────────── */
   if (phase === "lobby") {
     return (
       <>
@@ -452,27 +454,27 @@ export default function Game() {
     );
   }
 
-  /* ── Playing / Finished phase ──────────────────────────────── */
   return (
-    <div className="min-h-screen bg-slate-950 text-white flex flex-col">
+    <div className="min-h-screen bg-black text-white flex flex-col">
 
-      {/* ── Top bar ──────────────────────────────────────────── */}
-      <header className="flex flex-wrap items-center justify-between gap-2 px-3 sm:px-4 py-3
-                         bg-slate-900 border-b border-white/8 flex-shrink-0">
+      {/* Header */}
+      <header className="flex flex-wrap items-center justify-between gap-2
+                         px-3 sm:px-4 py-3 flex-shrink-0
+                         bg-[#0a0a0a] border-b border-white/8">
         <div className="flex items-center gap-2 sm:gap-3">
           <span className="text-lg sm:text-xl">🃏</span>
           <div className="hidden sm:block">
-            <h1 className="text-base font-bold leading-none">Card Blitz</h1>
-            <p className="text-[11px] text-slate-500 font-mono mt-0.5">{roomId}</p>
+            <h1 className="text-sm font-bold leading-none text-white">Card Blitz</h1>
+            <p className="text-[10px] text-gray-700 font-mono mt-0.5">{roomId}</p>
           </div>
         </div>
 
-        {/* Current turn banner */}
-        <div className={`text-xs sm:text-sm px-3 py-1 rounded-full border transition max-w-[150px] sm:max-w-none truncate text-center
-          ${isMyTurn
-            ? "bg-blue-900/50 border-blue-700 text-blue-300"
-            : "bg-slate-800 border-slate-700 text-slate-400"}`}
-        >
+        <div className={`text-xs sm:text-sm px-3 py-1 rounded-full border transition
+                         max-w-[150px] sm:max-w-none truncate text-center ${
+          isMyTurn
+            ? "bg-blue-950/60 border-blue-800/60 text-blue-300"
+            : "bg-white/4 border-white/8 text-gray-500"
+        }`}>
           {isMyTurn
             ? "⚡ Your turn"
             : `${players.find(p => p.id === currentTurn)?.name ?? "…"}'s turn`}
@@ -481,22 +483,26 @@ export default function Game() {
         <button
           id="btn-leave"
           onClick={() => navigate("/")}
-          className="text-xs px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700
-                     text-slate-400 hover:text-slate-200 transition whitespace-nowrap"
+          className="text-xs px-3 py-1.5 rounded-lg bg-white/4 hover:bg-white/8
+                     border border-white/8 text-gray-600 hover:text-gray-300
+                     transition whitespace-nowrap"
         >
           Leave
         </button>
       </header>
 
-      {/* ── Main layout ──────────────────────────────────────── */}
+      {/* Layout */}
       <div className="flex flex-col md:flex-row flex-1 overflow-hidden">
 
-        {/* Sidebar — players */}
-        <aside className="w-full md:w-48 flex-shrink-0 border-b md:border-b-0 md:border-r border-white/8 bg-slate-900/50 p-3 flex flex-row md:flex-col gap-4 overflow-x-auto md:overflow-y-auto hidden-scrollbar">
+        {/* Sidebar */}
+        <aside className="w-full md:w-52 flex-shrink-0
+                          border-b md:border-b-0 md:border-r border-white/8
+                          bg-[#0a0a0a] p-3
+                          flex flex-row md:flex-col gap-4
+                          overflow-x-auto md:overflow-y-auto hidden-scrollbar">
           <div className="flex-1 min-w-max">
-            <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-2 hidden md:block">
-              Players
-            </p>
+            <p className="text-[10px] font-semibold text-gray-700 uppercase tracking-wider
+                           mb-2 hidden md:block">Players</p>
             <div className="flex flex-row md:flex-col gap-1.5 pb-1 md:pb-0">
               {players.map(p => (
                 <PlayerRow
@@ -510,58 +516,43 @@ export default function Game() {
               ))}
             </div>
           </div>
-
-          {/* Scores */}
           <div className="hidden md:block">
-            <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-2">
+            <p className="text-[10px] font-semibold text-gray-700 uppercase tracking-wider mb-2">
               Tricks Won
             </p>
             {players.map(p => (
-              <div key={p.id}
-                   className="flex items-center justify-between text-xs py-0.5">
-                <span className="text-slate-400 truncate">{p.name}</span>
+              <div key={p.id} className="flex items-center justify-between text-xs py-0.5">
+                <span className="text-gray-600 truncate">{p.name}</span>
                 <span className="font-bold text-emerald-400 tabular-nums">{scores[p.id] ?? 0}</span>
               </div>
             ))}
           </div>
         </aside>
 
-        {/* Center — pile + your hand */}
-        <main className="flex-1 flex flex-col items-center justify-between p-2 pt-4 md:p-6 overflow-hidden md:overflow-auto">
-
-          {/* ── Pile (center) ───────────────────────────────── */}
+        {/* Center */}
+        <main className="flex-1 flex flex-col items-center justify-between
+                         p-2 pt-4 md:p-6 overflow-hidden md:overflow-auto">
           <div className="flex-1 flex items-center justify-center">
             <Pile pile={pile} leadSuit={leadSuit} players={players} />
           </div>
-
-          {/* ── Divider ─────────────────────────────────────── */}
           <div className="w-full max-w-lg border-t border-white/8 my-4" />
-
-          {/* ── Your hand ───────────────────────────────────── */}
           <div className="w-full flex flex-col items-center">
             {self && (
-              <p className="text-xs text-slate-500 mb-3 text-center">
+              <p className="text-xs text-gray-700 mb-3 text-center">
                 Your hand
                 {safePlayers.has(selfId) && (
                   <span className="ml-2 text-emerald-400 font-semibold">· You're safe! 🛡️</span>
                 )}
               </p>
             )}
-            <Hand
-              hand={hand}
-              isMyTurn={isMyTurn}
-              leadSuit={leadSuit}
-              onPlay={handlePlayCard}
-            />
+            <Hand hand={hand} isMyTurn={isMyTurn} leadSuit={leadSuit} onPlay={handlePlayCard} />
           </div>
         </main>
       </div>
 
-      {/* Game over overlay */}
       {phase === "finished" && (
         <GameOverOverlay result={gameResult} onLeave={() => navigate("/")} />
       )}
-
       <ToastStack toasts={toasts} />
     </div>
   );
