@@ -19,11 +19,13 @@ export default function Home() {
 
     socket.on("roomCreated", ({ roomId, players, maxPlayers: mp }) => {
       setLoading(false);
+      localStorage.setItem("cardblitz_session", JSON.stringify({ roomId, playerName: name.trim() }));
       navigate(`/game/${roomId}`, { state: { playerName: name, players, isHost: true, maxPlayers: mp } });
     });
 
     socket.on("playerJoined", ({ roomId, players, maxPlayers: mp }) => {
       setLoading(false);
+      localStorage.setItem("cardblitz_session", JSON.stringify({ roomId, playerName: name.trim() }));
       navigate(`/game/${roomId}`, { state: { playerName: name, players, isHost: false, maxPlayers: mp } });
     });
 
@@ -155,6 +157,8 @@ export default function Home() {
                   value={maxPlayers}
                   onChange={e => setMaxPlayers(Number(e.target.value))}
                 >
+                  <option value={6} className="bg-[#111]">6 Players</option>
+                  <option value={5} className="bg-[#111]">5 Players</option>
                   <option value={4} className="bg-[#111]">4 Players</option>
                   <option value={3} className="bg-[#111]">3 Players</option>
                   <option value={2} className="bg-[#111]">2 Players</option>

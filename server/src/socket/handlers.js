@@ -8,8 +8,17 @@ import {
   removePlayer,
   isRoomFull,
   getRoom,
+  markDisconnected,
+  rejoinRoom as rejoinRoomManager,
 } from "../game/roomManager.js";
-import { initGame, getPlayerView, removeGame, playCard } from "../game/gameState.js";
+import {
+  initGame,
+  getPlayerView,
+  getGameState,
+  removeGame,
+  playCard,
+  updatePlayerId,
+} from "../game/gameState.js";
 import { formatCard } from "../game/deck.js";
 
 /**
@@ -24,12 +33,11 @@ export function registerHandlers(io, socket) {
       return socket.emit("error", { message: "Player name is required" });
     }
 
-    // Must be between 2 and 4
-    const validMax = Math.max(2, Math.min(4, Number(maxPlayers) || 4));
+    // Must be between 2 and 6
+    const validMax = Math.max(2, Math.min(6, Number(maxPlayers) || 4));
 
     const { room } = createRoom(socket.id, playerName.trim(), validMax);
 
-    // Join the Socket.io channel so broadcasts work
     socket.join(room.roomId);
 
     console.log(
@@ -58,12 +66,10 @@ export function registerHandlers(io, socket) {
       return socket.emit("error", { message: error });
     }
 
-    // Join the Socket.io channel
     socket.join(id);
 
     console.log(`👤 ${playerName} joined room ${id} (${socket.id})`);
 
-    // Notify everyone in the room (including the new player)
     io.to(id).emit("playerJoined", {
       roomId: id,
       players: room.players,
@@ -71,13 +77,71 @@ export function registerHandlers(io, socket) {
       newPlayer: playerName.trim(),
     });
 
-    // If the room just filled up, broadcast roomFull
     if (isRoomFull(id)) {
       console.log(`🚫 Room ${id} is now full`);
       io.to(id).emit("roomFull", {
         roomId: id,
         players: room.players,
         maxPlayers: room.maxPlayers,
+      });
+    }
+  });
+
+  // ── Rejoin Room (reconnect) ───────────────────────────────────
+  socket.on("rejoinRoom", ({ roomId, playerName } = {}) => {
+    if (!roomId?.trim() || !playerName?.trim()) {
+      return socket.emit("rejoinError", { message: "Room ID and player name are required" });
+    }
+
+    const id = roomId.trim().toUpperCase();
+    const { room, oldSocketId, error } = rejoinRoomManager(id, playerName.trim(), socket.id);
+
+    if (error) {
+      console.log(`❌ Rejoin failed for ${playerName} in room ${id}: ${error}`);
+      return socket.emit("rejoinError", { message: error });
+    }
+
+    // Update player ID in game state
+    updatePlayerId(id, oldSocketId, socket.id);
+
+    // Rejoin the socket.io channel
+    socket.join(id);
+
+    console.log(`🔄 ${playerName} rejoined room ${id} (${oldSocketId} → ${socket.id})`);
+
+    // Notify others
+    io.to(id).emit("playerRejoined", {
+      playerName: playerName.trim(),
+      players: room.players,
+    });
+
+    // Send current game state back to the rejoining player
+    const gameState = getGameState(id);
+    if (gameState && gameState.status === "playing") {
+      const view = getPlayerView(id, room.players, socket.id);
+      socket.emit("gameRejoined", {
+        roomId: id,
+        players: room.players,
+        maxPlayers: room.maxPlayers,
+        phase: "playing",
+        gameView: view,
+      });
+    } else if (gameState && gameState.status === "finished") {
+      socket.emit("gameRejoined", {
+        roomId: id,
+        players: room.players,
+        maxPlayers: room.maxPlayers,
+        phase: "finished",
+        gameView: getPlayerView(id, room.players, socket.id),
+      });
+    } else {
+      // Still in lobby
+      socket.emit("gameRejoined", {
+        roomId: id,
+        players: room.players,
+        maxPlayers: room.maxPlayers,
+        phase: "lobby",
+        gameView: null,
       });
     }
   });
@@ -95,36 +159,29 @@ export function registerHandlers(io, socket) {
       return socket.emit("error", { message: "Room not found" });
     }
 
-    // Only the host can start the game
     const isHost = room.players.find((p) => p.id === socket.id)?.isHost;
     if (!isHost) {
       return socket.emit("error", { message: "Only the host can start the game" });
     }
 
-    // Start game requires room.maxPlayers
     if (room.players.length < room.maxPlayers) {
-      return socket.emit("error", { 
-        message: `Need exactly ${room.maxPlayers} players to start the game` 
+      return socket.emit("error", {
+        message: `Need exactly ${room.maxPlayers} players to start the game`,
       });
     }
 
-    // Prevent double-start
     if (room.gameStatus === "playing") {
       return socket.emit("error", { message: "Game already in progress" });
     }
 
-    // Initialize the game — deals cards, finds Ace of Spades holder
     const { gameState, error } = initGame(id, room.players);
 
     if (error) {
       return socket.emit("error", { message: error });
     }
 
-    // Mark room as in-play
     room.gameStatus = "playing";
 
-    // Send each player their own personalized view
-    // (they see their hand, but only card counts for opponents)
     for (const player of room.players) {
       const view = getPlayerView(id, room.players, player.id);
       io.to(player.id).emit("gameStarted", view);
@@ -145,18 +202,19 @@ export function registerHandlers(io, socket) {
       return socket.emit("invalidMove", { message: "Room not found" });
     }
 
-    // Execute the play — rules + gameState handle all validation and mutation
     const result = playCard(id, socket.id, card, room.players);
 
     if (!result.success) {
-      // Only hard errors reach here now (not your turn, card not in hand, etc.)
       return socket.emit("invalidMove", { message: result.error });
     }
 
     const playerName = room.players.find((p) => p.id === socket.id)?.name || "Unknown";
 
     // ── Always broadcast the card that was played ─────────────
-    // Each player gets a personalized view (own hand, opponents' card counts)
+    // If the trick or thulla just completed, override the pile in the view so
+    // all players see the FULL pile (including the last card) before it clears.
+    const pileOverride = result.completedPile ?? result.thullaPile ?? null;
+
     for (const player of room.players) {
       const view = getPlayerView(id, room.players, player.id);
       io.to(player.id).emit("cardPlayed", {
@@ -164,6 +222,8 @@ export function registerHandlers(io, socket) {
         playerName,
         card,
         ...view,
+        // Override pile so last card is visible before resolution
+        ...(pileOverride ? { pile: pileOverride } : {}),
       });
     }
 
@@ -186,13 +246,11 @@ export function registerHandlers(io, socket) {
         });
       }
 
-      // ── Emit safe events (may follow a Thulla) ───────────────
       for (const safe of result.newlySafe ?? []) {
         console.log(`🛡️  Emitting playerSafe: ${safe.name}`);
         io.to(id).emit("playerSafe", { playerId: safe.id, playerName: safe.name });
       }
 
-      // ── Game over by card depletion ───────────────────────────
       if (result.gameEnded) {
         room.gameStatus = "finished";
         io.to(id).emit("gameEnded", {
@@ -208,15 +266,26 @@ export function registerHandlers(io, socket) {
 
     // ── Normal trick path ─────────────────────────────────────
     if (result.trickComplete && result.trickWinner) {
-      io.to(id).emit("trickWon", result.trickWinner);
+      // Send trickWon with a personalized view so each client can update
+      // scores, currentTurn etc. while keeping the pile visible (pile is
+      // intentionally NOT included here — clients keep the pile from cardPlayed)
+      for (const player of room.players) {
+        const view = getPlayerView(id, room.players, player.id);
+        io.to(player.id).emit("trickWon", {
+          ...result.trickWinner,
+          currentTurn:  view.currentTurn,
+          hand:         view.hand,
+          opponents:    view.opponents,
+          safePlayers:  view.safePlayers,
+          leadSuit:     view.leadSuit,
+        });
+      }
 
-      // ── Emit safe events (may follow a trick completion) ─────
       for (const safe of result.newlySafe ?? []) {
         console.log(`🛡️  Emitting playerSafe: ${safe.name}`);
         io.to(id).emit("playerSafe", { playerId: safe.id, playerName: safe.name });
       }
 
-      // ── Game over by card depletion ───────────────────────────
       if (result.gameEnded) {
         room.gameStatus = "finished";
         io.to(id).emit("gameEnded", {
@@ -234,22 +303,39 @@ export function registerHandlers(io, socket) {
   socket.on("disconnect", (reason) => {
     console.log(`🔌 User disconnected: ${socket.id} (${reason})`);
 
-    const result = removePlayer(socket.id);
+    const markResult = markDisconnected(socket.id);
 
-    if (result.dissolved) {
-      removeGame(result.roomId);
-      console.log(`💨 Room ${result.roomId} dissolved (empty)`);
-    } else if (result.room) {
-      // Let remaining players know someone left
-      io.to(result.roomId).emit("playerLeft", {
-        roomId: result.roomId,
-        players: result.room.players,
+    if (markResult.roomId) {
+      // Active game — keep player as ghost, notify others
+      io.to(markResult.roomId).emit("playerLeft", {
+        roomId:         markResult.roomId,
+        players:        markResult.room?.players ?? [],
         disconnectedId: socket.id,
+        isTemporary:    true,
       });
       console.log(
-        `👋 Removed ${socket.id} from room ${result.roomId} ` +
-          `(${result.room.players.length} remaining)`
+        `👻 ${markResult.playerName} disconnected from room ${markResult.roomId} — ` +
+          `held for reconnect window`
       );
+    } else {
+      // Not in a game (lobby or unknown) — remove immediately
+      const result = removePlayer(socket.id);
+
+      if (result.dissolved) {
+        removeGame(result.roomId);
+        console.log(`💨 Room ${result.roomId} dissolved (empty)`);
+      } else if (result.room) {
+        io.to(result.roomId).emit("playerLeft", {
+          roomId:         result.roomId,
+          players:        result.room.players,
+          disconnectedId: socket.id,
+          isTemporary:    false,
+        });
+        console.log(
+          `👋 Removed ${socket.id} from room ${result.roomId} ` +
+            `(${result.room.players.length} remaining)`
+        );
+      }
     }
   });
 }

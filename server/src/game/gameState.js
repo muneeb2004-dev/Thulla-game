@@ -26,8 +26,8 @@ function initGame(roomId, players) {
     return { error: "Need at least 2 players to start" };
   }
 
-  if (players.length > 4) {
-    return { error: "Maximum 4 players allowed" };
+  if (players.length > 6) {
+    return { error: "Maximum 6 players allowed" };
   }
 
   // Create, shuffle, and distribute
@@ -319,10 +319,12 @@ function playCard(roomId, playerId, card, players) {
   // ── Thulla branch ──────────────────────────────────────────
   // Off-suit play accepted; round ends immediately and pile is redistributed.
   if (validation.isThulla) {
+    // Save the full pile (with Thulla card) before resolving clears it
+    const thullaPile = [...gameState.pile];
     const thullaResult = resolveThullaRound(roomId, gameState, players, playerId);
     // Win condition check AFTER redistribution (hands have settled)
     const win = checkWinCondition(gameState, players);
-    return { success: true, isThulla: true, thullaResult, ...win };
+    return { success: true, isThulla: true, thullaResult, thullaPile, ...win };
   }
 
   // ── Normal trick resolution ────────────────────────────────
@@ -352,6 +354,9 @@ function playCard(roomId, playerId, card, players) {
       tricksPlayed: gameState.tricksPlayed,
     };
 
+    // Save the completed pile before clearing so handlers can broadcast it
+    const completedPile = [...gameState.pile];
+
     // Reset pile and leadSuit; trick winner leads next
     gameState.pile     = [];
     gameState.leadSuit = null;
@@ -368,7 +373,7 @@ function playCard(roomId, playerId, card, players) {
 
     // Win condition check AFTER trick is fully resolved (hands settled)
     const win = checkWinCondition(gameState, players);
-    return { success: true, trickComplete: true, trickWinner: trickResult, ...win };
+    return { success: true, trickComplete: true, trickWinner: trickResult, completedPile, ...win };
   }
 
   // Trick not yet complete — advance to next player
@@ -414,6 +419,40 @@ function getPlayerView(roomId, players, playerId) {
   };
 }
 
+/**
+ * Update a player's socket ID everywhere in game state (used on reconnect).
+ * @param {string} roomId
+ * @param {string} oldId
+ * @param {string} newId
+ */
+function updatePlayerId(roomId, oldId, newId) {
+  const gameState = games.get(roomId);
+  if (!gameState) return;
+
+  // Scores
+  if (gameState.scores[oldId] !== undefined) {
+    gameState.scores[newId] = gameState.scores[oldId];
+    delete gameState.scores[oldId];
+  }
+
+  // Turn order & current turn
+  gameState.turnOrder = gameState.turnOrder.map(id => id === oldId ? newId : id);
+  if (gameState.currentTurn === oldId) gameState.currentTurn = newId;
+
+  // Pile entries
+  gameState.pile = gameState.pile.map(e =>
+    e.playerId === oldId ? { ...e, playerId: newId } : e
+  );
+
+  // Players list inside game state
+  const gsp = gameState.players.find(p => p.id === oldId);
+  if (gsp) gsp.id = newId;
+
+  // Safe players list
+  const safeIdx = gameState.safePlayers.indexOf(oldId);
+  if (safeIdx !== -1) gameState.safePlayers[safeIdx] = newId;
+}
+
 export {
   initGame,
   getGameState,
@@ -422,4 +461,5 @@ export {
   checkWinCondition,
   playCard,
   getPlayerView,
+  updatePlayerId,
 };

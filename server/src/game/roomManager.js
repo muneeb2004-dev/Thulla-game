@@ -1,8 +1,12 @@
 // ─── In-Memory Room Store ────────────────────────────────────────
-// Clean, modular room management with no external dependencies.
 
-const MAX_PLAYERS = 4;
+const MAX_PLAYERS = 6;
 const rooms = new Map();
+
+// Tracks disconnected players in active games, keyed by `${roomId}:${playerName}`.
+// Gives them a reconnect window before the slot is freed.
+const disconnectedPlayers = new Map();
+const RECONNECT_WINDOW_MS = 3 * 60 * 1000; // 3 minutes
 
 /**
  * Generate a unique 6-character alphanumeric room code.
@@ -14,31 +18,23 @@ function generateRoomId() {
     code = Array.from({ length: 6 }, () =>
       chars[Math.floor(Math.random() * chars.length)]
     ).join("");
-  } while (rooms.has(code)); // guarantee uniqueness
+  } while (rooms.has(code));
   return code;
 }
 
 /**
  * Create a new room and add the creator as the first player.
- * @param {string} socketId
- * @param {string} playerName
- * @param {number} maxPlayers
- * @returns {{ room: object }}
  */
 function createRoom(socketId, playerName, maxPlayers = 4) {
   const roomId = generateRoomId();
 
-  const player = {
-    id: socketId,
-    name: playerName,
-    isHost: true,
-  };
+  const player = { id: socketId, name: playerName, isHost: true };
 
   const room = {
     roomId,
     players: [player],
     maxPlayers,
-    gameStatus: "waiting", // "waiting" | "playing" | "finished"
+    gameStatus: "waiting",
     createdAt: Date.now(),
   };
 
@@ -48,42 +44,22 @@ function createRoom(socketId, playerName, maxPlayers = 4) {
 
 /**
  * Add a player to an existing room.
- * @param {string} roomId
- * @param {string} socketId
- * @param {string} playerName
- * @returns {{ room?: object, error?: string }}
  */
 function joinRoom(roomId, socketId, playerName) {
   const room = rooms.get(roomId);
-
-  if (!room) {
-    return { error: "Room not found" };
-  }
-
-  if (room.players.length >= room.maxPlayers) {
-    return { error: "Room is full" };
-  }
+  if (!room) return { error: "Room not found" };
+  if (room.players.length >= room.maxPlayers) return { error: "Room is full" };
 
   const alreadyIn = room.players.some((p) => p.id === socketId);
-  if (alreadyIn) {
-    return { error: "Already in this room" };
-  }
+  if (alreadyIn) return { error: "Already in this room" };
 
-  const player = {
-    id: socketId,
-    name: playerName,
-    isHost: false,
-  };
-
-  room.players.push(player);
+  room.players.push({ id: socketId, name: playerName, isHost: false });
   return { room };
 }
 
 /**
  * Remove a player from whatever room they're in.
  * Deletes the room if it becomes empty.
- * @param {string} socketId
- * @returns {{ roomId?: string, room?: object, dissolved?: boolean }}
  */
 function removePlayer(socketId) {
   for (const [roomId, room] of rooms) {
@@ -92,47 +68,115 @@ function removePlayer(socketId) {
 
     room.players.splice(index, 1);
 
-    // Room is empty → dissolve it
     if (room.players.length === 0) {
       rooms.delete(roomId);
       return { roomId, dissolved: true };
     }
 
-    // If the host left, promote the next player
     const hasHost = room.players.some((p) => p.isHost);
-    if (!hasHost) {
-      room.players[0].isHost = true;
-    }
+    if (!hasHost) room.players[0].isHost = true;
 
     return { roomId, room };
   }
-
   return {};
 }
 
 /**
- * Get a room by its ID.
- * @param {string} roomId
- * @returns {object|undefined}
+ * Mark a player as disconnected during an active game.
+ * Keeps their slot open for RECONNECT_WINDOW_MS so they can rejoin.
+ * Only applies when the room's gameStatus is "playing".
+ *
+ * @returns {{ roomId?, room?, playerName? }} — empty object if not in an active game
  */
+function markDisconnected(socketId) {
+  for (const [roomId, room] of rooms) {
+    const playerIdx = room.players.findIndex((p) => p.id === socketId);
+    if (playerIdx === -1) continue;
+
+    // Only hold ghost slots during active games
+    if (room.gameStatus !== "playing") return {};
+
+    const player = room.players[playerIdx];
+    const playerName = player.name;
+    const key = `${roomId}:${playerName}`;
+
+    // Cancel any existing cleanup timer (re-disconnect before reconnect)
+    const existing = disconnectedPlayers.get(key);
+    if (existing?.cleanupTimer) clearTimeout(existing.cleanupTimer);
+
+    // Mark in-place so the slot remains visible to other players
+    player.isDisconnected = true;
+
+    const cleanupTimer = setTimeout(() => {
+      disconnectedPlayers.delete(key);
+      const r = rooms.get(roomId);
+      if (!r) return;
+
+      const idx = r.players.findIndex(
+        (p) => p.name === playerName && p.isDisconnected
+      );
+      if (idx !== -1) r.players.splice(idx, 1);
+
+      // Dissolve room if no active players remain
+      const activePlayers = r.players.filter((p) => !p.isDisconnected);
+      if (activePlayers.length === 0) {
+        rooms.delete(roomId);
+      } else if (!r.players.some((p) => p.isHost)) {
+        activePlayers[0].isHost = true;
+      }
+    }, RECONNECT_WINDOW_MS);
+
+    disconnectedPlayers.set(key, { roomId, oldSocketId: socketId, cleanupTimer });
+
+    return { roomId, room, playerName };
+  }
+  return {};
+}
+
+/**
+ * Restore a disconnected player with their new socket ID.
+ *
+ * @returns {{ room?, oldSocketId?, error? }}
+ */
+function rejoinRoom(roomId, playerName, newSocketId) {
+  const key = `${roomId}:${playerName}`;
+  const entry = disconnectedPlayers.get(key);
+
+  if (!entry) {
+    return { error: "No active session found. Try joining fresh." };
+  }
+
+  const room = rooms.get(roomId);
+  if (!room) {
+    clearTimeout(entry.cleanupTimer);
+    disconnectedPlayers.delete(key);
+    return { error: "Room no longer exists" };
+  }
+
+  clearTimeout(entry.cleanupTimer);
+  disconnectedPlayers.delete(key);
+
+  const player = room.players.find((p) => p.id === entry.oldSocketId);
+  if (!player) {
+    return { error: "Player slot no longer available" };
+  }
+
+  const oldSocketId = player.id;
+  player.id = newSocketId;
+  player.isDisconnected = false;
+
+  return { room, oldSocketId };
+}
+
 function getRoom(roomId) {
   return rooms.get(roomId);
 }
 
-/**
- * Check whether a room is full.
- * @param {string} roomId
- * @returns {boolean}
- */
 function isRoomFull(roomId) {
   const room = rooms.get(roomId);
   return room ? room.players.length >= room.maxPlayers : false;
 }
 
-/**
- * Get all rooms (for debugging / admin).
- * @returns {object[]}
- */
 function getAllRooms() {
   return Array.from(rooms.values());
 }
@@ -144,4 +188,6 @@ export {
   getRoom,
   isRoomFull,
   getAllRooms,
+  markDisconnected,
+  rejoinRoom,
 };
